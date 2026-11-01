@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MAFIA · Trust no one</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--tx:#eceaf4;--mut:#9a98b0;--red:#ff4d5e;--gold:#f5c451;--grn:#4ade80;--glass:rgba(20,18,36,.62);--line:rgba(255,255,255,.1)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;min-height:100%}
+body{color:var(--tx);font:16px Inter,system-ui,sans-serif;background:#0b0a16;transition:background 1.2s;overflow-x:hidden}
+body.lobby{background:radial-gradient(ellipse at 50% -10%,#3b1d5e,#0b0a16 65%)}
+body.night{background:radial-gradient(ellipse at 80% 0,#1b2a5c,#080a1c 60%)}
+body.day{background:linear-gradient(#ff9a5a,#c9506e 45%,#3a2250)}
+body.over{background:radial-gradient(ellipse at 50% 0,#5a1428,#0b0a16 65%)}
+#sky{position:fixed;inset:0;z-index:0;pointer-events:none;transition:opacity 1.2s}
+body.day #sky{opacity:.12}
+#sky i{position:absolute;width:2px;height:2px;border-radius:50%;background:#fff;animation:tw 3s infinite alternate}
+@keyframes tw{from{opacity:.15}to{opacity:1}}
+#moon{position:fixed;top:70px;right:8%;width:70px;height:70px;border-radius:50%;z-index:0;opacity:0;transition:opacity 1.2s;
+ background:radial-gradient(circle at 35% 35%,#fff,#cfd6ff 60%,#8f9ad8);box-shadow:0 0 60px 12px rgba(160,175,255,.35)}
+body.night #moon{opacity:1}
+#wrap{position:relative;z-index:1;max-width:760px;margin:auto;padding:14px 14px 24px;display:grid;gap:14px}
+.logo{font:800 clamp(2.4rem,11vw,4.2rem)/1 Cinzel,serif;letter-spacing:.14em;text-align:center;margin:8vh 0 4px;
+ background:linear-gradient(#fff,#ff4d5e);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 4px 24px rgba(255,77,94,.45))}
+.tag{text-align:center;color:var(--mut);letter-spacing:.3em;font-size:.75rem;text-transform:uppercase;margin-bottom:18px}
+.card{background:var(--glass);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid var(--line);border-radius:18px;padding:16px;box-shadow:0 10px 40px rgba(0,0,0,.35)}
+h2{font:800 1.5rem Cinzel,serif;margin:0 0 6px;letter-spacing:.06em}
+.mut{color:var(--mut)}.err{color:var(--red);min-height:1.2em;margin:8px 0 0}
+input,button{font:inherit;border-radius:12px;border:1px solid var(--line);padding:13px 14px;color:var(--tx);background:rgba(0,0,0,.35);outline:none}
+input:focus{border-color:var(--gold)}
+button{cursor:pointer;transition:.15s transform,.2s box-shadow}
+button:active{transform:scale(.97)}
+.btn{background:linear-gradient(135deg,#ff4d5e,#b3203f);border:0;font-weight:600;letter-spacing:.04em;box-shadow:0 6px 24px rgba(255,77,94,.35)}
+.btn.sec{background:rgba(255,255,255,.08);box-shadow:none}.btn:disabled{opacity:.4;cursor:default}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.row>input{flex:1;min-width:110px}.row>.btn{flex:1}
+.code{font:800 2.6rem Cinzel,serif;letter-spacing:.3em;color:var(--gold);text-shadow:0 0 24px rgba(245,196,81,.5);text-align:center;cursor:pointer}
+.bar{display:flex;justify-content:space-between;align-items:center;font-size:.8rem;color:var(--mut)}
+.pill{padding:5px 12px;border-radius:99px;background:rgba(255,255,255,.1);font-weight:600;color:var(--tx);letter-spacing:.08em}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:12px}
+.pc{display:flex;align-items:center;gap:10px;text-align:left;padding:10px;position:relative;background:rgba(0,0,0,.3)}
+.pc i{flex:none;width:42px;height:42px;border-radius:50%;display:grid;place-items:center;font:800 1.1rem Cinzel,serif;font-style:normal;
+ background:hsl(var(--h) 60% 45%);box-shadow:inset 0 0 0 2px rgba(255,255,255,.25)}
+.pc b{display:block;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:90px}
+.pc small{color:var(--mut);font-size:.72rem}
+.pc.pick{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold),0 0 22px rgba(245,196,81,.35);animation:pulse 1.6s infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 1px var(--gold),0 0 34px rgba(245,196,81,.6)}}
+.pc.dead{opacity:.4;filter:grayscale(1)}.pc.dead b{text-decoration:line-through}
+.pc.ally{border-color:var(--red)}
+.vt{position:absolute;top:-8px;right:-6px;background:var(--red);border-radius:99px;padding:2px 8px;font-size:.78rem;font-weight:700;box-shadow:0 4px 12px rgba(0,0,0,.4)}
+.role{display:flex;gap:14px;align-items:center;perspective:800px}
+.rc{flex:none;width:84px;height:110px;border-radius:14px;display:grid;place-items:center;font-size:2.6rem;border:2px solid var(--gold);
+ background:linear-gradient(160deg,#2a2150,#120e26);box-shadow:0 8px 28px rgba(0,0,0,.5);animation:flip .9s both}
+.rc.mafia{border-color:var(--red);background:linear-gradient(160deg,#5a1226,#16060d)}
+@keyframes flip{from{transform:rotateY(90deg) scale(.7);opacity:0}to{transform:none;opacity:1}}
+.role h3{margin:0;font:800 1.3rem Cinzel,serif;letter-spacing:.08em}
+.prompt{margin:12px 0 0;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.07);border-left:3px solid var(--gold)}
+.tabs{display:flex;gap:6px;margin-bottom:8px}.tabs button{flex:1;padding:8px;background:rgba(255,255,255,.06)}.tabs button.on{background:rgba(255,255,255,.18);font-weight:600}
+#feed{max-height:210px;overflow:auto;font-size:.92rem;display:grid;gap:4px}
+#feed div{padding:5px 8px;border-radius:8px;background:rgba(0,0,0,.25)}
+.ev{border-left:3px solid var(--red)}.maf{color:#ff8a96}
+#banner{position:fixed;inset:0;z-index:9;display:grid;place-items:center;pointer-events:none;opacity:0;background:rgba(5,4,12,.72);
+ font:800 clamp(1.8rem,8vw,3.4rem) Cinzel,serif;letter-spacing:.12em;text-align:center;padding:20px}
+#banner.show{animation:bn 2.2s}
+@keyframes bn{0%{opacity:0;transform:scale(1.15)}15%,75%{opacity:1;transform:none}100%{opacity:0}}
+</style></head><body class="lobby">
+<div id="sky"></div><div id="moon"></div><div id="banner"></div>
+<div id="wrap"><div id="main"></div>
+<div class="card" id="side" style="display:none">
+  <div class="tabs"><button id="t1" class="on">📜 Log</button><button id="t2">💬 Chat</button></div>
+  <div id="feed"></div>
+  <div class="row" id="chatrow" style="display:none"><input id="chatin" placeholder="Say something..." maxlength="200"><button class="btn" id="chatbtn" style="flex:none">Send</button></div>
+</div></div>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io(), $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const save = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+const load = k => { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } };
+const hue = s => [...s].reduce((a, c) => a * 31 + c.charCodeAt(0), 7) % 360;
+const ROLES = {
+  mafia: ['🔪', 'Mafia', 'Eliminate the town. Blend in. Lie well.'],
+  doctor: ['💉', 'Doctor', 'Save one life each night.'],
+  detective: ['🔍', 'Detective', 'Investigate one suspect each night.'],
+  town: ['🏘️', 'Townsperson', 'Find the Mafia. Vote wisely.']
+};
+let S = null, err = '', tab = 'log', lastKey = '';
+for (let i = 0; i < 70; i++) { const s = document.createElement('i'); s.style.cssText = `left:${Math.random()*100}%;top:${Math.random()*100}%;animation-delay:${Math.random()*3}s`; $('sky').appendChild(s); }
+
+function banner(t) { const b = $('banner'); b.textContent = t; b.classList.remove('show'); void b.offsetWidth; b.classList.add('show'); }
+socket.on('connect', () => { const c = load('mafia_code'), p = load('mafia_pid'), n = load('mafia_name'); if (c && p && n) socket.emit('join', { name: n, code: c, pid: p }); });
+socket.on('joined', ({ pid }) => save('mafia_pid', pid));
+socket.on('err', m => { err = m; if (!S) save('mafia_code', ''); render(); });
+socket.on('state', s => {
+  const key = s.phase + s.round + (s.winner || '');
+  if (S && key !== lastKey) {
+    if (s.phase === 'night') banner(s.round === 1 ? '🎭 Your role awaits…' : `🌙 Night ${s.round} falls`);
+    else if (s.phase === 'day') banner(`☀️ Day ${s.round} breaks`);
+    else if (s.phase === 'over') banner(`${s.winner === 'Town' ? '🏆' : '🩸'} ${s.winner} wins!`);
+  }
+  lastKey = key; S = s; err = ''; save('mafia_code', s.code); render();
+});
+const join = code => {
+  const name = $('name').value.trim(); if (!name) { err = 'Enter a name first'; return render(); }
+  save('mafia_name', name);
+  socket.emit('join', { name, code, pid: code && code === load('mafia_code') ? load('mafia_pid') : '' });
+};
+const act = t => socket.emit('act', t);
+
+function render() {
+  document.body.className = S ? (S.phase === 'play' ? 'day' : S.phase) : 'lobby';
+  if (!S) {
+    $('side').style.display = 'none';
+    $('main').innerHTML = `<div class="logo">MAFIA</div><div class="tag">Trust no one</div>
+      <div class="card"><input id="name" style="width:100%" placeholder="Your name" maxlength="16" value="${esc(load('mafia_name'))}">
+      <div class="row"><button class="btn" id="create">⚡ Create room</button></div>
+      <div class="row"><input id="code" placeholder="CODE" maxlength="4" style="text-transform:uppercase;letter-spacing:.3em;text-align:center"><button class="btn sec" id="jn">Join</button></div>
+      <div class="err">${esc(err)}</div></div>`;
+    $('create').onclick = () => join('');
+    $('jn').onclick = () => join($('code').value.trim().toUpperCase());
+    return;
+  }
+  $('side').style.display = '';
+  const { phase, me, players, votes } = S, [ico, rname, rdesc] = ROLES[me.role] || [];
+  const tally = id => Object.values(votes).filter(v => v === id).length;
+  const canPick = me.alive && !S.acted && ((phase === 'night' && me.role !== 'town') || phase === 'day');
+  const prompt = phase === 'over' ? '' : !me.alive ? '💀 You are dead. Watch in silence.'
+    : phase === 'night' ? ({ mafia: '🔪 Choose your victim.', doctor: '💉 Choose who to protect.', detective: '🔍 Choose who to investigate.', town: '😴 You sleep. The night is long...' }[me.role])
+    : '🗳️ Discuss, accuse, then vote someone out.';
+  let h = '';
+  if (phase === 'lobby') {
+    h = `<div class="logo" style="margin-top:3vh;font-size:2.4rem">MAFIA</div>
+      <div class="card"><div class="mut" style="text-align:center">ROOM CODE · tap to copy</div><div class="code" id="cp">${S.code}</div>
+      <div class="grid">${players.map(p => `<div class="card pc"><i style="--h:${hue(p.name)}">${esc(p.name[0].toUpperCase())}</i><div><b>${esc(p.name)}</b><small>${p.id === me.id ? 'you' : ''}${p.connected ? '' : ' offline'}${p.id === players[0].id ? ' · host' : ''}</small></div></div>`).join('')}</div>
+      <div class="row">${S.isHost ? `<button class="btn" id="start" ${players.length < 4 ? 'disabled' : ''}>${players.length < 4 ? `Need ${4 - players.length} more player(s)` : '🎬 Start game'}</button>` : '<span class="mut">Waiting for the host to start…</span>'}</div>
+      <div class="err">${esc(err)}</div></div>`;
+  } else {
+    h = `<div class="bar"><span class="pill">${phase === 'night' ? '🌙 NIGHT' : phase === 'day' ? '☀️ DAY' : '🏁 FINISHED'} ${S.round}</span><span>Room ${S.code}</span></div>
+      <div class="card"><div class="role"><div class="rc ${me.role}">${ico}</div><div><div class="mut" style="font-size:.75rem;letter-spacing:.2em">YOUR ROLE</div><h3>${rname}</h3><div class="mut">${rdesc}</div></div></div>
+      ${phase === 'over' ? `<h2 style="margin-top:14px;color:${S.winner === 'Town' ? 'var(--grn)' : 'var(--red)'}">${S.winner} wins!</h2>` : `<div class="prompt">${prompt}${S.acted && me.alive ? ' <b>✔ Locked in.</b>' : ''}</div>`}
+      ${me.role === 'detective' && S.notes.length ? `<div class="prompt" style="border-color:var(--grn)">${S.notes.map(n => `🔍 ${esc(n)}`).join('<br>')}</div>` : ''}
+      <div class="grid">${players.map(p => {
+        const ok = canPick && p.alive && !(phase === 'night' && ((me.role === 'mafia' && p.role === 'mafia') || (me.role === 'detective' && p.id === me.id)));
+        const t = phase === 'day' ? tally(p.id) : 0;
+        return `<button class="card pc ${ok ? 'pick' : ''} ${p.alive ? '' : 'dead'} ${p.role === 'mafia' && me.role === 'mafia' ? 'ally' : ''}" data-id="${p.id}" ${ok ? '' : 'disabled'}>
+          ${t ? `<span class="vt">🗳️ ${t}</span>` : ''}<i style="--h:${hue(p.name)}">${p.alive ? esc(p.name[0].toUpperCase()) : '💀'}</i>
+          <div><b>${esc(p.name)}</b><small>${p.id === me.id ? 'you' : ''} ${p.role ? ({ mafia: '🔪 mafia', doctor: '💉', detective: '🔍', town: '🏘️' }[p.role]) : ''}${p.connected ? '' : ' offline'}</small></div></button>`;
+      }).join('')}</div>
+      <div class="row">${phase === 'day' && canPick ? '<button class="btn sec" id="skip">⏭ Skip vote</button>' : ''}
+      ${S.isHost && (phase === 'night' || phase === 'day') ? '<button class="btn sec" id="force">⏩ Force end phase</button>' : ''}
+      ${S.isHost && phase === 'over' ? '<button class="btn" id="again">🔁 Play again</button>' : ''}</div></div>`;
+  }
+  $('main').innerHTML = h;
+  document.querySelectorAll('.pc[data-id]').forEach(b => b.onclick = () => act(b.dataset.id));
+  const on = (id, f) => $(id) && ($(id).onclick = f);
+  on('start', () => socket.emit('start')); on('skip', () => act('skip')); on('force', () => socket.emit('force')); on('again', () => socket.emit('again'));
+  on('cp', () => navigator.clipboard && navigator.clipboard.writeText(S.code));
+  feed();
+}
+function feed() {
+  $('t1').className = tab === 'log' ? 'on' : ''; $('t2').className = tab === 'chat' ? 'on' : '';
+  $('chatrow').style.display = tab === 'chat' ? '' : 'none';
+  const f = $('feed'), bottom = f.scrollHeight - f.scrollTop - f.clientHeight < 40 || f.dataset.tab !== tab;
+  f.dataset.tab = tab;
+  f.innerHTML = tab === 'log' ? S.log.map(l => `<div class="${/killed|eliminated|wins/.test(l) ? 'ev' : ''}">${esc(l)}</div>`).join('') || '<div class="mut">Nothing yet…</div>'
+    : S.chat.map(m => `<div class="${m.ch === 'mafia' ? 'maf' : ''}"><b>${esc(m.from)}${m.ch === 'mafia' ? ' 🔪' : ''}:</b> ${esc(m.text)}</div>`).join('') || '<div class="mut">No messages yet…</div>';
+  if (bottom) f.scrollTop = f.scrollHeight;
+}
+$('t1').onclick = () => { tab = 'log'; S && feed(); };
+$('t2').onclick = () => { tab = 'chat'; S && feed(); };
+const send = () => { const v = $('chatin').value.trim(); if (v) { socket.emit('chat', v); $('chatin').value = ''; } };
+$('chatbtn').onclick = send; $('chatin').onkeydown = e => { if (e.key === 'Enter') send(); };
+render();
+</script></body></html>
