@@ -11,6 +11,8 @@ const rooms = {};
 const newCode = () => Math.random().toString(36).slice(2, 6).toUpperCase();
 const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const alive = r => Object.values(r.players).filter(p => p.alive);
+const maxM = n => Math.max(1, Math.floor((n - 1) / 2));
+const effM = r => { const n = Object.keys(r.players).length; return Math.min(r.mafiaCount || Math.max(1, Math.floor(n / 3)), maxM(n)); };
 const clean = s => String(s || '').trim().slice(0, 200);
 
 function view(r, pid) {
@@ -18,7 +20,7 @@ function view(r, pid) {
   const over = r.phase === 'over';
   const chat = r.chat.filter(m => m.ch === 'all' || me.role === 'mafia').slice(-60);
   return {
-    code: r.code, phase: r.phase, round: r.round, winner: r.winner, isHost: r.host === pid,
+    code: r.code, mafiaCount: effM(r), maxMafia: maxM(Object.keys(r.players).length), mv: (me.role === 'mafia' && r.phase === 'night' && r.night) ? r.night.kill : {}, phase: r.phase, round: r.round, winner: r.winner, isHost: r.host === pid,
     me: { id: pid, name: me.name, role: me.role, alive: me.alive },
     acted: r.phase === 'night' ? !!me.acted : !!r.votes[pid],
     votes: r.phase === 'day' ? r.votes : {},
@@ -36,9 +38,9 @@ const say = (r, t) => r.log.push(t);
 
 function startGame(r) {
   const ids = shuffle(Object.keys(r.players));
-  const n = ids.length, mafia = Math.max(1, Math.floor(n / 4));
+  const n = ids.length, mafia = effM(r);
   const roles = Array(mafia).fill('mafia');
-  if (n >= 5) roles.push('doctor', 'detective');
+  if (n >= 5 && mafia + 2 <= n) roles.push('doctor', 'detective');
   while (roles.length < n) roles.push('town');
   shuffle(roles);
   ids.forEach((id, i) => Object.assign(r.players[id], { role: roles[i], alive: true, notes: [], acted: false }));
@@ -59,7 +61,10 @@ function checkWin(r) {
   return false;
 }
 function nightDone(r) {
-  return alive(r).every(p => !['mafia', 'doctor', 'detective'].includes(p.role) || p.acted);
+  const al = alive(r);
+  const mv = al.filter(p => p.role === 'mafia').map(p => r.night.kill[p.id]);
+  if (mv.some(v => !v) || new Set(mv).size > 1) return false; // Mafia must agree on ONE victim
+  return al.every(p => !['doctor', 'detective'].includes(p.role) || p.acted);
 }
 function endNight(r) {
   const counts = {};
@@ -118,10 +123,15 @@ io.on('connection', socket => {
     if (Object.keys(r.players).length < 4) return socket.emit('err', 'Need at least 4 players');
     startGame(r); broadcast(r);
   });
+  socket.on('setMafia', n => {
+    const r = R(); if (!r || r.host !== socket.data.pid || r.phase !== 'lobby') return;
+    r.mafiaCount = Math.max(1, Math.min(parseInt(n) || 1, maxM(Object.keys(r.players).length)));
+    broadcast(r);
+  });
   socket.on('act', target => {
     const r = R(); const me = r && r.players[socket.data.pid];
     if (!r || !me || !me.alive) return;
-    if (r.phase === 'night' && !me.acted) {
+    if (r.phase === 'night' && (!me.acted || me.role === 'mafia')) {
       const t = r.players[target]; if (!t || !t.alive) return;
       if (me.role === 'mafia') { if (t.role === 'mafia') return; r.night.kill[me.id] = target; }
       else if (me.role === 'doctor') r.night.save = target;
@@ -157,6 +167,18 @@ io.on('connection', socket => {
     const r = R(); if (!r || r.host !== socket.data.pid || r.phase !== 'over') return;
     Object.values(r.players).forEach(p => Object.assign(p, { role: undefined, alive: true, notes: [] }));
     Object.assign(r, { phase: 'lobby', log: [], chat: [], votes: {}, winner: null });
+    broadcast(r);
+  });
+  socket.on('leave', () => {
+    const r = R(); const pid = socket.data.pid; const p = r && r.players[pid];
+    if (!p) return;
+    socket.data.code = null;
+    if (r.phase === 'lobby') {
+      delete r.players[pid];
+      const left = Object.keys(r.players);
+      if (!left.length) { delete rooms[r.code]; return; }
+      if (r.host === pid) r.host = left[0];
+    } else { p.connected = false; p.sid = null; }
     broadcast(r);
   });
   socket.on('disconnect', () => {

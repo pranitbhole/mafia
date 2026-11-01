@@ -45,6 +45,7 @@ button:active{transform:scale(.97)}
 .pc small{color:var(--mut);font-size:.72rem}
 .pc.pick{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold),0 0 22px rgba(245,196,81,.35);animation:pulse 1.6s infinite}
 @keyframes pulse{50%{box-shadow:0 0 0 1px var(--gold),0 0 34px rgba(245,196,81,.6)}}
+.pc.mine{border-color:var(--red);box-shadow:0 0 0 1px var(--red)}
 .pc.dead{opacity:.4;filter:grayscale(1)}.pc.dead b{text-decoration:line-through}
 .pc.ally{border-color:var(--red)}
 .vt{position:absolute;top:-8px;right:-6px;background:var(--red);border-radius:99px;padding:2px 8px;font-size:.78rem;font-weight:700;box-shadow:0 4px 12px rgba(0,0,0,.4)}
@@ -106,6 +107,11 @@ const join = code => {
   socket.emit('join', { name, code, pid: code && code === load('mafia_code') ? load('mafia_pid') : '' });
 };
 const act = t => socket.emit('act', t);
+function leave() {
+  if (S && S.phase !== 'lobby' && !confirm('Leave the game in progress? You will not be able to rejoin.')) return;
+  socket.emit('leave'); save('mafia_code', ''); save('mafia_pid', '');
+  S = null; lastKey = ''; err = ''; render();
+}
 
 function render() {
   document.body.className = S ? (S.phase === 'play' ? 'day' : S.phase) : 'lobby';
@@ -123,27 +129,34 @@ function render() {
   $('side').style.display = '';
   const { phase, me, players, votes } = S, [ico, rname, rdesc] = ROLES[me.role] || [];
   const tally = id => Object.values(votes).filter(v => v === id).length;
-  const canPick = me.alive && !S.acted && ((phase === 'night' && me.role !== 'town') || phase === 'day');
+  const canPick = me.alive && (!S.acted || (phase === 'night' && me.role === 'mafia')) && ((phase === 'night' && me.role !== 'town') || phase === 'day');
+  const mafs = players.filter(p => p.alive && p.role === 'mafia'), mv = S.mv || {};
+  const picks = mafs.map(p => mv[p.id]).filter(Boolean), agreed = picks.length === mafs.length && new Set(picks).size === 1;
+  const mafMsg = me.role !== 'mafia' || phase !== 'night' || !me.alive ? '' : agreed
+    ? ` ✅ All Mafia agree on <b>${esc((players.find(p => p.id === picks[0]) || {}).name)}</b>. Waiting for the others to finish.`
+    : ` ⚠️ Kill needs ALL Mafia to pick the same player (${picks.length}/${mafs.length} picked). Discuss in chat, then match your picks. You can change yours.`;
   const prompt = phase === 'over' ? '' : !me.alive ? '💀 You are dead. Watch in silence.'
-    : phase === 'night' ? ({ mafia: '🔪 Choose your victim.', doctor: '💉 Choose who to protect.', detective: '🔍 Choose who to investigate.', town: '😴 You sleep. The night is long...' }[me.role])
+    : phase === 'night' ? ({ mafia: '🔪 Choose your victim together.', doctor: '💉 Choose who to protect.', detective: '🔍 Choose who to investigate.', town: '😴 You sleep. The night is long...' }[me.role])
     : '🗳️ Discuss, accuse, then vote someone out.';
   let h = '';
   if (phase === 'lobby') {
     h = `<div class="logo" style="margin-top:3vh;font-size:2.4rem">MAFIA</div>
       <div class="card"><div class="mut" style="text-align:center">ROOM CODE · tap to copy</div><div class="code" id="cp">${S.code}</div>
       <div class="grid">${players.map(p => `<div class="card pc"><i style="--h:${hue(p.name)}">${esc(p.name[0].toUpperCase())}</i><div><b>${esc(p.name)}</b><small>${p.id === me.id ? 'you' : ''}${p.connected ? '' : ' offline'}${p.id === players[0].id ? ' · host' : ''}</small></div></div>`).join('')}</div>
+      <div class="prompt" style="display:flex;justify-content:space-between;align-items:center;gap:8px">🔪 Mafia in this game: <span>${S.isHost ? `<button class="btn sec" id="mm" style="padding:4px 12px">−</button> <b>${S.mafiaCount}</b> <button class="btn sec" id="mp" style="padding:4px 12px">+</button>` : `<b>${S.mafiaCount}</b>`} <small class="mut">(max ${S.maxMafia})</small></span></div>
       <div class="row">${S.isHost ? `<button class="btn" id="start" ${players.length < 4 ? 'disabled' : ''}>${players.length < 4 ? `Need ${4 - players.length} more player(s)` : '🎬 Start game'}</button>` : '<span class="mut">Waiting for the host to start…</span>'}</div>
-      <div class="err">${esc(err)}</div></div>`;
+      <div class="row"><button class="btn sec" id="leave">🚪 Leave room</button></div><div class="err">${esc(err)}</div></div>`;
   } else {
-    h = `<div class="bar"><span class="pill">${phase === 'night' ? '🌙 NIGHT' : phase === 'day' ? '☀️ DAY' : '🏁 FINISHED'} ${S.round}</span><span>Room ${S.code}</span></div>
+    h = `<div class="bar"><span class="pill">${phase === 'night' ? '🌙 NIGHT' : phase === 'day' ? '☀️ DAY' : '🏁 FINISHED'} ${S.round}</span><span>Room ${S.code} <button class="btn sec" id="leave" style="padding:4px 10px;margin-left:6px">Leave</button></span></div>
       <div class="card"><div class="role"><div class="rc ${me.role}">${ico}</div><div><div class="mut" style="font-size:.75rem;letter-spacing:.2em">YOUR ROLE</div><h3>${rname}</h3><div class="mut">${rdesc}</div></div></div>
-      ${phase === 'over' ? `<h2 style="margin-top:14px;color:${S.winner === 'Town' ? 'var(--grn)' : 'var(--red)'}">${S.winner} wins!</h2>` : `<div class="prompt">${prompt}${S.acted && me.alive ? ' <b>✔ Locked in.</b>' : ''}</div>`}
+      ${phase === 'over' ? `<h2 style="margin-top:14px;color:${S.winner === 'Town' ? 'var(--grn)' : 'var(--red)'}">${S.winner} wins!</h2>` : `<div class="prompt">${prompt}${mafMsg}${S.acted && me.alive && me.role !== 'mafia' ? ' <b>✔ Locked in.</b>' : ''}</div>`}
       ${me.role === 'detective' && S.notes.length ? `<div class="prompt" style="border-color:var(--grn)">${S.notes.map(n => `🔍 ${esc(n)}`).join('<br>')}</div>` : ''}
       <div class="grid">${players.map(p => {
         const ok = canPick && p.alive && !(phase === 'night' && ((me.role === 'mafia' && p.role === 'mafia') || (me.role === 'detective' && p.id === me.id)));
         const t = phase === 'day' ? tally(p.id) : 0;
-        return `<button class="card pc ${ok ? 'pick' : ''} ${p.alive ? '' : 'dead'} ${p.role === 'mafia' && me.role === 'mafia' ? 'ally' : ''}" data-id="${p.id}" ${ok ? '' : 'disabled'}>
-          ${t ? `<span class="vt">🗳️ ${t}</span>` : ''}<i style="--h:${hue(p.name)}">${p.alive ? esc(p.name[0].toUpperCase()) : '💀'}</i>
+        const mn = phase === 'night' && me.role === 'mafia' ? mafs.filter(m => mv[m.id] === p.id).map(m => m.name) : [];
+        return `<button class="card pc ${ok ? 'pick' : ''} ${mv[me.id] === p.id && phase === 'night' ? 'mine' : ''} ${p.alive ? '' : 'dead'} ${p.role === 'mafia' && me.role === 'mafia' ? 'ally' : ''}" data-id="${p.id}" ${ok ? '' : 'disabled'}>
+          ${t ? `<span class="vt">🗳️ ${t}</span>` : ''}${mn.length ? `<span class="vt">🔪 ${esc(mn.join(', '))}</span>` : ''}<i style="--h:${hue(p.name)}">${p.alive ? esc(p.name[0].toUpperCase()) : '💀'}</i>
           <div><b>${esc(p.name)}</b><small>${p.id === me.id ? 'you' : ''} ${p.role ? ({ mafia: '🔪 mafia', doctor: '💉', detective: '🔍', town: '🏘️' }[p.role]) : ''}${p.connected ? '' : ' offline'}</small></div></button>`;
       }).join('')}</div>
       <div class="row">${phase === 'day' && canPick ? '<button class="btn sec" id="skip">⏭ Skip vote</button>' : ''}
@@ -154,6 +167,8 @@ function render() {
   document.querySelectorAll('.pc[data-id]').forEach(b => b.onclick = () => act(b.dataset.id));
   const on = (id, f) => $(id) && ($(id).onclick = f);
   on('start', () => socket.emit('start')); on('skip', () => act('skip')); on('force', () => socket.emit('force')); on('again', () => socket.emit('again'));
+  on('leave', leave);
+  on('mm', () => socket.emit('setMafia', S.mafiaCount - 1)); on('mp', () => socket.emit('setMafia', S.mafiaCount + 1));
   on('cp', () => navigator.clipboard && navigator.clipboard.writeText(S.code));
   feed();
 }
